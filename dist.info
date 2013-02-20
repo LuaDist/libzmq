@@ -1,0 +1,32 @@
+type = "x86"
+arch = "Windows"
+author = "Zeromq Developers"
+desc = "The 0MQ lightweight messaging kernel."
+name = "libzmq"
+maintainer = "Peter Drahoš"
+files = {
+Runtime = {
+[[bin\libzmq.dll]],
+}
+,
+Data = {
+[[share\libzmq\AUTHORS]],
+[[share\libzmq\COPYING]],
+[[share\libzmq\README]],
+[[share\libzmq\NEWS]],
+}
+,
+Library = {
+[[lib\libzmq.dll.a]],
+}
+,
+Header = {
+[[include\zmq.h]],
+[[include\zmq_utils.h]],
+}
+,
+}
+
+license = "LGPL"
+url = "http://www.zeromq.org"
+version = "3.1.0"

@@ -1,0 +1,28 @@
+type = "x86_64"
+arch = "Ubuntu"
+author = "Zeromq Developers"
+desc = "The 0MQ lightweight messaging kernel."
+name = "libzmq"
+maintainer = "Peter Drahoš"
+files = {
+Runtime = {
+[[lib/libzmq.so]],
+}
+,
+Header = {
+[[include/zmq.h]],
+[[include/zmq_utils.h]],
+}
+,
+Data = {
+[[share/libzmq/AUTHORS]],
+[[share/libzmq/COPYING]],
+[[share/libzmq/README]],
+[[share/libzmq/NEWS]],
+}
+,
+}
+
+license = "LGPL"
+url = "http://www.zeromq.org"
+version = "3.1.0"

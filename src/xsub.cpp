@@ -24,8 +24,8 @@
 #include "xsub.hpp"
 #include "err.hpp"
 
-zmq::xsub_t::xsub_t (class ctx_t *parent_, uint32_t tid_) :
-    socket_base_t (parent_, tid_),
+zmq::xsub_t::xsub_t (class ctx_t *parent_, uint32_t tid_, int sid_) :
+    socket_base_t (parent_, tid_, sid_),
     has_message (false),
     more (false)
 {
@@ -47,6 +47,9 @@ zmq::xsub_t::~xsub_t ()
 
 void zmq::xsub_t::xattach_pipe (pipe_t *pipe_, bool icanhasall_)
 {
+    // icanhasall_ is unused
+    (void)icanhasall_;
+
     zmq_assert (pipe_);
     fq.attach (pipe_);
     dist.attach (pipe_);
@@ -92,20 +95,24 @@ int zmq::xsub_t::xsend (msg_t *msg_, int flags_)
 
     // Process the subscription.
     if (*data == 1) {
-        if (subscriptions.add (data + 1, size - 1))
-            return dist.send_to_all (msg_, flags_);
-        else
-            return 0;
+	// this used to filter out duplicate subscriptions,
+	// however this is alread done on the XPUB side and
+	// doing it here as well breaks ZMQ_XPUB_VERBOSE
+	// when there are forwarding devices involved
+        subscriptions.add (data + 1, size - 1);
+        return dist.send_to_all (msg_, flags_);
     }
-    else if (*data == 0) {
+    else {
         if (subscriptions.rm (data + 1, size - 1))
             return dist.send_to_all (msg_, flags_);
-        else
-            return 0;
     }
 
-    zmq_assert (false);
-    return -1;
+    int rc = msg_->close ();
+    errno_assert (rc == 0);
+    rc = msg_->init ();
+    errno_assert (rc == 0);
+
+    return 0;
 }
 
 bool zmq::xsub_t::xhas_out ()
@@ -116,6 +123,9 @@ bool zmq::xsub_t::xhas_out ()
 
 int zmq::xsub_t::xrecv (msg_t *msg_, int flags_)
 {
+    // flags_ is unused
+    (void)flags_;
+
     //  If there's already a message prepared by a previous call to zmq_poll,
     //  return it straight ahead.
     if (has_message) {
@@ -132,7 +142,7 @@ int zmq::xsub_t::xrecv (msg_t *msg_, int flags_)
     while (true) {
 
         //  Get a message using fair queueing algorithm.
-        int rc = fq.recv (msg_, flags_);
+        int rc = fq.recv (msg_);
 
         //  If there's no message available, return immediately.
         //  The same when error occurs.
@@ -149,8 +159,8 @@ int zmq::xsub_t::xrecv (msg_t *msg_, int flags_)
         //  Message doesn't match. Pop any remaining parts of the message
         //  from the pipe.
         while (msg_->flags () & msg_t::more) {
-            rc = fq.recv (msg_, ZMQ_DONTWAIT);
-            zmq_assert (rc == 0);
+            rc = fq.recv (msg_);
+            errno_assert (rc == 0);
         }
     }
 }
@@ -171,12 +181,12 @@ bool zmq::xsub_t::xhas_in ()
     while (true) {
 
         //  Get a message using fair queueing algorithm.
-        int rc = fq.recv (&message, ZMQ_DONTWAIT);
+        int rc = fq.recv (&message);
 
         //  If there's no message available, return immediately.
         //  The same when error occurs.
         if (rc != 0) {
-            zmq_assert (errno == EAGAIN);
+            errno_assert (errno == EAGAIN);
             return false;
         }
 
@@ -189,8 +199,8 @@ bool zmq::xsub_t::xhas_in ()
         //  Message doesn't match. Pop any remaining parts of the message
         //  from the pipe.
         while (message.flags () & msg_t::more) {
-            rc = fq.recv (&message, ZMQ_DONTWAIT);
-            zmq_assert (rc == 0);
+            rc = fq.recv (&message);
+            errno_assert (rc == 0);
         }
     }
 }
@@ -208,7 +218,7 @@ void zmq::xsub_t::send_subscription (unsigned char *data_, size_t size_,
     //  Create the subsctription message.
     msg_t msg;
     int rc = msg.init_size (size_ + 1);
-    zmq_assert (rc == 0);
+    errno_assert (rc == 0);
     unsigned char *data = (unsigned char*) msg.data ();
     data [0] = 1;
     memcpy (data + 1, data_, size_);

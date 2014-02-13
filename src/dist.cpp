@@ -80,12 +80,19 @@ void zmq::dist_t::terminated (pipe_t *pipe_)
 {
     //  Remove the pipe from the list; adjust number of matching, active and/or
     //  eligible pipes accordingly.
-    if (pipes.index (pipe_) < matching)
+    if (pipes.index (pipe_) < matching) {
+        pipes.swap (pipes.index (pipe_), matching - 1);
         matching--;
-    if (pipes.index (pipe_) < active)
+    }
+    if (pipes.index (pipe_) < active) {
+        pipes.swap (pipes.index (pipe_), active - 1);
         active--;
-    if (pipes.index (pipe_) < eligible)
+    }
+    if (pipes.index (pipe_) < eligible) {
+        pipes.swap (pipes.index (pipe_), eligible - 1);
         eligible--;
+    }
+
     pipes.erase (pipe_);
 }
 
@@ -128,18 +135,22 @@ int zmq::dist_t::send_to_matching (msg_t *msg_, int flags_)
 
 void zmq::dist_t::distribute (msg_t *msg_, int flags_)
 {
+    // flags_ is unused
+    (void)flags_;
+
     //  If there are no matching pipes available, simply drop the message.
     if (matching == 0) {
         int rc = msg_->close ();
         errno_assert (rc == 0);
         rc = msg_->init ();
-        zmq_assert (rc == 0);
+        errno_assert (rc == 0);
         return;
     }
 
     if (msg_->is_vsm ()) {
         for (pipes_t::size_type i = 0; i < matching; ++i)
-            write (pipes [i], msg_);
+            if(!write (pipes [i], msg_))
+                --i; //  Retry last write because index will have been swapped
         int rc = msg_->close();
         errno_assert (rc == 0);
         rc = msg_->init ();
@@ -154,8 +165,10 @@ void zmq::dist_t::distribute (msg_t *msg_, int flags_)
     //  Push copy of the message to each matching pipe.
     int failed = 0;
     for (pipes_t::size_type i = 0; i < matching; ++i)
-        if (!write (pipes [i], msg_))
+        if (!write (pipes [i], msg_)) {
             ++failed;
+            --i; //  Retry last write because index will have been swapped
+        }
     if (unlikely (failed))
         msg_->rm_refs (failed);
 

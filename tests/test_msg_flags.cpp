@@ -19,21 +19,22 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <assert.h>
+#include "../include/zmq.h"
 #include <string.h>
 
-#include "../include/zmq.h"
+#undef NDEBUG
+#include <assert.h>
 
-int main (int argc, char *argv [])
+int main (void)
 {
     //  Create the infrastructure
     void *ctx = zmq_init (0);
     assert (ctx);
-    void *sb = zmq_socket (ctx, ZMQ_XREP);
+    void *sb = zmq_socket (ctx, ZMQ_ROUTER);
     assert (sb);
     int rc = zmq_bind (sb, "inproc://a");
     assert (rc == 0);
-    void *sc = zmq_socket (ctx, ZMQ_XREQ);
+    void *sc = zmq_socket (ctx, ZMQ_DEALER);
     assert (sc);
     rc = zmq_connect (sc, "inproc://a");
     assert (rc == 0);
@@ -50,26 +51,19 @@ int main (int argc, char *argv [])
     assert (rc == 0);
     rc = zmq_recvmsg (sb, &msg, 0);
     assert (rc >= 0);
-    int more;
-    size_t more_size = sizeof (more);
-    rc = zmq_msg_get (&msg, ZMQ_MORE, &more, &more_size);
-    assert (rc == 0);
+    int more = zmq_msg_get (&msg, ZMQ_MORE);
     assert (more == 1);
 
     //  Then the first part of the message body.
     rc = zmq_recvmsg (sb, &msg, 0);
     assert (rc == 1);
-    more_size = sizeof (more);
-    rc = zmq_msg_get (&msg, ZMQ_MORE, &more, &more_size);
-    assert (rc == 0);
+    more = zmq_msg_get (&msg, ZMQ_MORE);
     assert (more == 1);
 
     //  And finally, the second part of the message body.
     rc = zmq_recvmsg (sb, &msg, 0);
     assert (rc == 1);
-    more_size = sizeof (more);
-    rc = zmq_msg_get (&msg, ZMQ_MORE, &more, &more_size);
-    assert (rc == 0);
+    more = zmq_msg_get (&msg, ZMQ_MORE);
     assert (more == 0);
 
     //  Deallocate the infrastructure.

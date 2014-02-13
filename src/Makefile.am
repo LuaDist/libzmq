@@ -23,6 +23,12 @@ libzmq_la_SOURCES = \
     err.hpp \
     fd.hpp \
     fq.hpp \
+    i_encoder.hpp \
+    i_decoder.hpp \
+    i_engine.hpp \
+    i_msg_sink.hpp \
+    i_msg_source.hpp \
+    i_poll_events.hpp \
     io_object.hpp \
     io_thread.hpp \
     ip.hpp \
@@ -50,6 +56,7 @@ libzmq_la_SOURCES = \
     poller.hpp \
     poller_base.hpp \
     pair.hpp \
+    proxy.hpp \
     pub.hpp \
     pull.hpp \
     push.hpp \
@@ -64,6 +71,7 @@ libzmq_la_SOURCES = \
     stdint.hpp \
     stream_engine.hpp \
     sub.hpp \
+    tcp.hpp \
     tcp_address.hpp \
     tcp_connecter.hpp \
     tcp_listener.hpp \
@@ -72,8 +80,8 @@ libzmq_la_SOURCES = \
     windows.hpp \
     wire.hpp \
     xpub.hpp \
-    xrep.hpp \
-    xreq.hpp \
+    router.hpp \
+    dealer.hpp \
     xsub.hpp \
     ypipe.hpp \
     yqueue.hpp \
@@ -110,6 +118,7 @@ libzmq_la_SOURCES = \
     poller_base.cpp \
     pull.cpp \
     push.cpp \
+    proxy.cpp \
     reaper.cpp \
     pub.cpp \
     random.cpp \
@@ -121,14 +130,20 @@ libzmq_la_SOURCES = \
     socket_base.cpp \
     stream_engine.cpp \
     sub.cpp \
+    tcp.cpp \
     tcp_address.cpp \
     tcp_connecter.cpp \
     tcp_listener.cpp \
     thread.cpp \
     trie.cpp \
     xpub.cpp \
-    xrep.cpp \
-    xreq.cpp \
+    router.cpp \
+    dealer.cpp \
+    v1_decoder.cpp \
+    v1_decoder.hpp \
+    v1_encoder.cpp \
+    v1_encoder.hpp \
+    v1_protocol.hpp \
     xsub.cpp \
     zmq.cpp \
     zmq_utils.cpp
@@ -136,7 +151,11 @@ libzmq_la_SOURCES = \
 if ON_MINGW
 libzmq_la_LDFLAGS = -no-undefined -avoid-version -version-info @LTVER@ @LIBZMQ_EXTRA_LDFLAGS@
 else
+if ON_ANDROID
+libzmq_la_LDFLAGS = -avoid-version -version-info @LTVER@ @LIBZMQ_EXTRA_LDFLAGS@
+else
 libzmq_la_LDFLAGS = -version-info @LTVER@ @LIBZMQ_EXTRA_LDFLAGS@
+endif
 endif
 
 libzmq_la_CXXFLAGS = @LIBZMQ_EXTRA_CXXFLAGS@

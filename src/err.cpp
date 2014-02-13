@@ -72,6 +72,7 @@ void zmq::zmq_abort(const char *errmsg_)
     extra_info [0] = (ULONG_PTR) errmsg_;
     RaiseException (0x40000015, EXCEPTION_NONCONTINUABLE, 1, extra_info);
 #else
+    (void)errmsg_;
     abort ();
 #endif
 }
@@ -202,52 +203,89 @@ const char *zmq::wsa_error_no (int no_)
 void zmq::win_error (char *buffer_, size_t buffer_size_)
 {
     DWORD errcode = GetLastError ();
+#if defined WINCE
+    DWORD rc = FormatMessage (FORMAT_MESSAGE_FROM_SYSTEM |
+        FORMAT_MESSAGE_IGNORE_INSERTS, NULL, errcode, MAKELANGID(LANG_NEUTRAL,
+        SUBLANG_DEFAULT), (LPWSTR)buffer_, buffer_size_ / sizeof(wchar_t), NULL );
+#else
     DWORD rc = FormatMessageA (FORMAT_MESSAGE_FROM_SYSTEM |
         FORMAT_MESSAGE_IGNORE_INSERTS, NULL, errcode, MAKELANGID(LANG_NEUTRAL,
         SUBLANG_DEFAULT), buffer_, (DWORD) buffer_size_, NULL );
+#endif
     zmq_assert (rc);
 }
 
-void zmq::wsa_error_to_errno ()
+int zmq::wsa_error_to_errno (int errcode)
 {
-    int errcode = WSAGetLastError ();
     switch (errcode) {
-    case WSAEINPROGRESS:
-        errno = EAGAIN;
-        return;
+//  10009 - File handle is not valid.
     case WSAEBADF:
-        errno = EBADF;
-        return;
-    case WSAEINVAL:
-        errno = EINVAL;
-        return;
-    case WSAEMFILE:
-        errno = EMFILE;
-        return;
+        return EBADF;
+//  10013 - Permission denied.
+    case WSAEACCES:
+        return EACCES;
+//  10014 - Bad address.
     case WSAEFAULT:
-        errno = EFAULT;
-        return;
+        return EFAULT;
+//  10022 - Invalid argument.
+    case WSAEINVAL:
+        return EINVAL;
+//  10024 - Too many open files.
+    case WSAEMFILE:
+        return EMFILE;
+//  10036 - Operation now in progress.
+    case WSAEINPROGRESS:
+        return EAGAIN;
+//  10040 - Message too long.
+    case WSAEMSGSIZE:
+        return EMSGSIZE;
+//  10043 - Protocol not supported.
     case WSAEPROTONOSUPPORT:
-        errno = EPROTONOSUPPORT;
-        return;
-    case WSAENOBUFS:
-        errno = ENOBUFS;
-        return;
-    case WSAENETDOWN:
-        errno = ENETDOWN;
-        return;
-    case WSAEADDRINUSE:
-        errno = EADDRINUSE;
-        return;
-    case WSAEADDRNOTAVAIL:
-        errno = EADDRNOTAVAIL;
-        return;
+        return EPROTONOSUPPORT;
+//  10047 - Address family not supported by protocol family.
     case WSAEAFNOSUPPORT:
-        errno = EAFNOSUPPORT;
-        return;
+        return EAFNOSUPPORT;
+//  10048 - Address already in use.
+    case WSAEADDRINUSE:
+        return EADDRINUSE;
+//  10049 - Cannot assign requested address.
+    case WSAEADDRNOTAVAIL:
+        return EADDRNOTAVAIL;
+//  10050 - Network is down.
+    case WSAENETDOWN:
+        return ENETDOWN;
+//  10051 - Network is unreachable.
+    case WSAENETUNREACH:
+        return ENETUNREACH;
+//  10052 - Network dropped connection on reset.
+    case WSAENETRESET:
+        return ENETRESET;
+//  10053 - Software caused connection abort.
+    case WSAECONNABORTED:
+        return ECONNABORTED;
+//  10054 - Connection reset by peer.
+    case WSAECONNRESET:
+        return ECONNRESET;
+//  10055 - No buffer space available.
+    case WSAENOBUFS:
+        return ENOBUFS;
+//  10057 - Socket is not connected.
+    case WSAENOTCONN:
+        return ENOTCONN;
+//  10060 - Connection timed out.
+    case WSAETIMEDOUT:
+        return ETIMEDOUT;
+//  10061 - Connection refused.
+    case WSAECONNREFUSED:
+        return ECONNREFUSED;
+//  10065 - No route to host.
+    case WSAEHOSTUNREACH:
+        return EHOSTUNREACH;
     default:
         wsa_assert (false);
     }
+    //  Not reachable
+    return 0;
 }
 
 #endif

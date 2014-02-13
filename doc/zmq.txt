@@ -19,7 +19,7 @@ DESCRIPTION
 The 0MQ lightweight messaging kernel is a library which extends the standard
 socket interfaces with features traditionally provided by specialised
 _messaging middleware_ products. 0MQ sockets provide an abstraction of
-asynchronous  _message queues_, multiple _messaging patterns_, message
+asynchronous _message queues_, multiple _messaging patterns_, message
 filtering (_subscriptions_), seamless access to multiple _transport protocols_
 and more.
 
@@ -30,9 +30,24 @@ provided by the 0MQ library.
 
 Context
 ~~~~~~~
-Before using any 0MQ library functions the caller must initialise a 0MQ
-'context' using _zmq_init()_. The following functions are provided to handle
-initialisation and termination of a 'context':
+Before using any 0MQ library functions you must create a 0MQ 'context'. When
+you exit your application you must destroy the 'context'. These functions let
+you work with 'contexts':
+
+Create a new 0MQ context::
+    linkzmq:zmq_ctx_new[3]
+
+Work with context properties::
+    linkzmq:zmq_ctx_set[3]
+    linkzmq:zmq_ctx_get[3]
+
+Destroy a 0MQ context::
+    linkzmq:zmq_ctx_destroy[3]
+
+Monitor a 0MQ context::
+    linkzmq:zmq_ctx_set_monitor[3]
+
+These deprecated functions let you create and destroy 'contexts':
 
 Initialise 0MQ context::
     linkzmq:zmq_init[3]
@@ -121,10 +136,10 @@ Establishing a message flow::
     linkzmq:zmq_connect[3]
 
 Sending and receiving messages::
+    linkzmq:zmq_msg_send[3]
+    linkzmq:zmq_msg_recv[3]
     linkzmq:zmq_send[3]
-    linkzmq:zmq_sendmsg[3]
     linkzmq:zmq_recv[3]
-    linkzmq:zmq_recvmsg[3]
 
 .Input/output multiplexing
 0MQ provides a mechanism for applications to multiplex input/output events over
@@ -152,6 +167,14 @@ Local inter-process communication transport::
 
 Local in-process (inter-thread) communication transport::
     linkzmq:zmq_inproc[7]
+
+
+Proxies
+~~~~~~~
+0MQ provides 'proxies' to create fanout and fan-in topologies. A proxy connects
+a 'frontend' socket to a 'backend' socket and switches all messages between the
+two sockets, opaquely. A proxy may optionally capture all traffic to a third
+socket. To start a proxy in an application thread, use linkzmq:zmq_proxy[3].
 
 
 ERROR HANDLING
@@ -186,8 +209,8 @@ by C programmers. The intent is that programmers using 0MQ from other languages
 shall refer to this documentation alongside any documentation provided by the
 vendor of their language binding.
 
-Language bindings (Python, PHP, Ruby, Java and more) are provided by members
-of the 0MQ community and pointers can be found on the 0MQ website.
+Language bindings ($$C++$$, Python, PHP, Ruby, Java and more) are provided by
+members of the 0MQ community and pointers can be found on the 0MQ website.
 
 
 AUTHORS

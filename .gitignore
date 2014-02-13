@@ -20,6 +20,9 @@ autom4te.cache
 .*
 *~
 .*~
+tests/test_term_endpoint
+tests/test_monitor
+tests/test_last_endpoint
 tests/test_pair_inproc
 tests/test_pair_ipc
 tests/test_pair_tcp
@@ -36,6 +39,10 @@ tests/test_invalid_rep
 tests/test_msg_flags
 tests/test_ts_context
 tests/test_connect_resolve
+tests/test_connect_delay
+tests/test_term_endpoint
+tests/test_router_mandatory
+tests/test_disconnect_inproc
 src/platform.hpp*
 src/stamp-h1
 perf/local_lat

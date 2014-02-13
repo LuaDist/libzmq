@@ -1,6 +1,6 @@
 /*
+    Copyright (c) 2007-2012 iMatix Corporation
     Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -22,8 +22,8 @@
 #include "pub.hpp"
 #include "msg.hpp"
 
-zmq::pub_t::pub_t (class ctx_t *parent_, uint32_t tid_) :
-    xpub_t (parent_, tid_)
+zmq::pub_t::pub_t (class ctx_t *parent_, uint32_t tid_, int sid_) :
+    xpub_t (parent_, tid_, sid_)
 {
     options.type = ZMQ_PUB;
 }
@@ -32,7 +32,7 @@ zmq::pub_t::~pub_t ()
 {
 }
 
-int zmq::pub_t::xrecv (class msg_t *msg_, int flags_)
+int zmq::pub_t::xrecv (class msg_t *, int)
 {
     //  Messages cannot be received from PUB socket.
     errno = ENOTSUP;

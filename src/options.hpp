@@ -24,9 +24,12 @@
 #define __ZMQ_OPTIONS_HPP_INCLUDED__
 
 #include <string>
+#include <vector>
 
 #include "stddef.h"
 #include "stdint.hpp"
+#include "tcp_address.hpp"
+#include "../include/zmq.h"
 
 namespace zmq
 {
@@ -48,8 +51,8 @@ namespace zmq
         //  Socket identity
         unsigned char identity_size;
         unsigned char identity [256];
-        
-        // Last socket endpoint URI
+
+        // Last socket endpoint resolved URI
         std::string last_endpoint;
 
         //  Maximum tranfer rate [kb/s]. Default 100kb/s.
@@ -93,6 +96,10 @@ namespace zmq
         //  possible to communicate with IPv6-only hosts. If 0, the socket can
         //  connect to and accept connections from both IPv4 and IPv6 hosts.
         int ipv4only;
+        
+        //  If 1, connecting pipes are not attached immediately, meaning a send()
+        //  on a socket with only connecting pipes would block
+        int delay_attach_on_connect;
 
         //  If true, session reads all the pending messages from the pipe and
         //  sends them to the network when socket is closed.
@@ -105,11 +112,22 @@ namespace zmq
         //  If 1, (X)SUB socket should filter the messages. If 0, it should not.
         bool filter;
 
-        //  Sends identity to all new connections.
-        bool send_identity;
-
-        //  Receivers identity from all new connections.
+        //  If true, the identity message is forwarded to the socket.
         bool recv_identity;
+
+        //  TCP keep-alive settings.
+        //  Defaults to -1 = do not change socket options
+        int tcp_keepalive;
+        int tcp_keepalive_cnt;
+        int tcp_keepalive_idle;
+        int tcp_keepalive_intvl;
+
+        // TCP accept() filters
+        typedef std::vector <tcp_address_mask_t> tcp_accept_filters_t;
+        tcp_accept_filters_t tcp_accept_filters;
+
+        //  ID of the socket.
+        int socket_id;
     };
 
 }

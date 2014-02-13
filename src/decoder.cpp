@@ -21,16 +21,22 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <limits>
+
+#include "platform.hpp"
+#if defined ZMQ_HAVE_WINDOWS
+#include "windows.hpp"
+#endif
 
 #include "decoder.hpp"
-#include "session_base.hpp"
+#include "i_msg_sink.hpp"
 #include "likely.hpp"
 #include "wire.hpp"
 #include "err.hpp"
 
 zmq::decoder_t::decoder_t (size_t bufsize_, int64_t maxmsgsize_) :
     decoder_base_t <decoder_t> (bufsize_),
-    session (NULL),
+    msg_sink (NULL),
     maxmsgsize (maxmsgsize_)
 {
     int rc = in_progress.init ();
@@ -46,9 +52,9 @@ zmq::decoder_t::~decoder_t ()
     errno_assert (rc == 0);
 }
 
-void zmq::decoder_t::set_session (session_base_t *session_)
+void zmq::decoder_t::set_msg_sink (i_msg_sink *msg_sink_)
 {
-    session = session_;
+    msg_sink = msg_sink_;
 }
 
 bool zmq::decoder_t::one_byte_size_ready ()
@@ -91,33 +97,41 @@ bool zmq::decoder_t::one_byte_size_ready ()
 
 bool zmq::decoder_t::eight_byte_size_ready ()
 {
-    //  8-byte size is read. Allocate the buffer for message body and
-    //  read the message data into it.
-    size_t size = (size_t) get_uint64 (tmpbuf);
+    //  8-byte payload length is read. Allocate the buffer
+    //  for message body and read the message data into it.
+    const uint64_t payload_length = get_uint64 (tmpbuf);
 
     //  There has to be at least one byte (the flags) in the message).
-    if (!size) {
+    if (payload_length == 0) {
         decoding_error ();
         return false;
     }
 
-    //  in_progress is initialised at this point so in theory we should
-    //  close it before calling zmq_msg_init_size, however, it's a 0-byte
-    //  message and thus we can treat it as uninitialised...
-    int rc;
-    if (maxmsgsize >= 0 && (int64_t) (size - 1) > maxmsgsize) {
-        rc = -1;
-        errno = ENOMEM;
+    //  Message size must not exceed the maximum allowed size.
+    if (maxmsgsize >= 0 && payload_length - 1 > (uint64_t) maxmsgsize) {
+        decoding_error ();
+        return false;
     }
-    else
-        rc = in_progress.init_size (size - 1);
-    if (rc != 0 && errno == ENOMEM) {
+
+    //  Message size must fit within range of size_t data type.
+    if (payload_length - 1 > std::numeric_limits <size_t>::max ()) {
+        decoding_error ();
+        return false;
+    }
+
+    const size_t msg_size = static_cast <size_t> (payload_length - 1);
+
+    //  in_progress is initialised at this point so in theory we should
+    //  close it before calling init_size, however, it's a 0-byte
+    //  message and thus we can treat it as uninitialised...
+    int rc = in_progress.init_size (msg_size);
+    if (rc != 0) {
+        errno_assert (errno == ENOMEM);
         rc = in_progress.init ();
         errno_assert (rc == 0);
         decoding_error ();
         return false;
     }
-    errno_assert (rc == 0);
 
     next_step (tmpbuf, 1, &decoder_t::flags_ready);
     return true;
@@ -126,11 +140,11 @@ bool zmq::decoder_t::eight_byte_size_ready ()
 bool zmq::decoder_t::flags_ready ()
 {
     //  Store the flags from the wire into the message structure.
-    in_progress.set_flags (tmpbuf [0]);
+    in_progress.set_flags (tmpbuf [0] & msg_t::more);
 
     next_step (in_progress.data (), in_progress.size (),
         &decoder_t::message_ready);
-    
+
     return true;
 }
 
@@ -138,9 +152,9 @@ bool zmq::decoder_t::message_ready ()
 {
     //  Message is completely read. Push it further and start reading
     //  new message. (in_progress is a 0-byte message after this point.)
-    if (unlikely (!session))
+    if (unlikely (!msg_sink))
         return false;
-    int rc = session->write (&in_progress);
+    int rc = msg_sink->push_msg (&in_progress);
     if (unlikely (rc != 0)) {
         if (errno != EAGAIN)
             decoding_error ();

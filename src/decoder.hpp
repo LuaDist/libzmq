@@ -29,12 +29,11 @@
 
 #include "err.hpp"
 #include "msg.hpp"
+#include "i_decoder.hpp"
 #include "stdint.hpp"
 
 namespace zmq
 {
-
-    class session_base_t;
 
     //  Helper base class for decoders that know the amount of data to read
     //  in advance at any moment. Knowing the amount in advance is a property
@@ -47,14 +46,14 @@ namespace zmq
     //  This class implements the state machine that parses the incoming buffer.
     //  Derived class should implement individual state machine actions.
 
-    template <typename T> class decoder_base_t
+    template <typename T> class decoder_base_t : public i_decoder
     {
     public:
 
         inline decoder_base_t (size_t bufsize_) :
+            next (NULL),
             read_pos (NULL),
             to_read (0),
-            next (NULL),
             bufsize (bufsize_)
         {
             buf = (unsigned char*) malloc (bufsize_);
@@ -142,6 +141,32 @@ namespace zmq
             }
         }
 
+        //  Returns true if the decoder has been fed all required data
+        //  but cannot proceed with the next decoding step.
+        //  False is returned if the decoder has encountered an error.
+        bool stalled ()
+        {
+            //  Check whether there was decoding error.
+            if (unlikely (!(static_cast <T*> (this)->next)))
+                return false;
+
+            while (!to_read) {
+                if (!(static_cast <T*> (this)->*next) ()) {
+                    if (unlikely (!(static_cast <T*> (this)->next)))
+                        return false;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        inline bool message_ready_size (size_t msg_sz)
+        {
+            zmq_assert (false);
+            return false;
+        }
+
     protected:
 
         //  Prototype of state machine action. Action should return false if
@@ -167,16 +192,16 @@ namespace zmq
 
     private:
 
+        //  Next step. If set to NULL, it means that associated data stream
+        //  is dead. Note that there can be still data in the process in such
+        //  case.
+        step_t next;
+
         //  Where to store the read data.
         unsigned char *read_pos;
 
         //  How much data to read before taking next step.
         size_t to_read;
-
-        //  Next step. If set to NULL, it means that associated data stream
-        //  is dead. Note that there can be still data in the process in such
-        //  case.
-        step_t next;
 
         //  The duffer for data to decode.
         size_t bufsize;
@@ -195,7 +220,8 @@ namespace zmq
         decoder_t (size_t bufsize_, int64_t maxmsgsize_);
         ~decoder_t ();
 
-        void set_session (zmq::session_base_t *session_);
+        //  Set the receiver of decoded messages.
+        void set_msg_sink (i_msg_sink *msg_sink_);
 
     private:
 
@@ -204,7 +230,7 @@ namespace zmq
         bool flags_ready ();
         bool message_ready ();
 
-        zmq::session_base_t *session;
+        i_msg_sink *msg_sink;
         unsigned char tmpbuf [8];
         msg_t in_progress;
 

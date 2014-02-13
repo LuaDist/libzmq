@@ -95,7 +95,11 @@ zmq::signaler_t::~signaler_t ()
     int rc = close (r);
     errno_assert (rc == 0);
 #elif defined ZMQ_HAVE_WINDOWS
-    int rc = closesocket (w);
+    struct linger so_linger = { 1, 0 };
+    int rc = setsockopt (w, SOL_SOCKET, SO_LINGER,
+        (char *)&so_linger, sizeof (so_linger));
+    wsa_assert (rc != SOCKET_ERROR);
+    rc = closesocket (w);
     wsa_assert (rc != SOCKET_ERROR);
     rc = closesocket (r);
     wsa_assert (rc != SOCKET_ERROR);
@@ -144,7 +148,7 @@ int zmq::signaler_t::wait (int timeout_)
     pfd.events = POLLIN;
     int rc = poll (&pfd, 1, timeout_);
     if (unlikely (rc < 0)) {
-        zmq_assert (errno == EINTR);
+        errno_assert (errno == EINTR);
         return -1;
     }
     else if (unlikely (rc == 0)) {
@@ -173,7 +177,7 @@ int zmq::signaler_t::wait (int timeout_)
     int rc = select (r + 1, &fds, NULL, NULL,
         timeout_ >= 0 ? &timeout : NULL);
     if (unlikely (rc < 0)) {
-        zmq_assert (errno == EINTR);
+        errno_assert (errno == EINTR);
         return -1;
     }
 #endif
@@ -233,12 +237,26 @@ int zmq::signaler_t::make_fdpair (fd_t *r_, fd_t *w_)
     return 0;
 
 #elif defined ZMQ_HAVE_WINDOWS
+    SECURITY_DESCRIPTOR sd = {0};
+    SECURITY_ATTRIBUTES sa = {0};
+
+    InitializeSecurityDescriptor(&sd, SECURITY_DESCRIPTOR_REVISION);
+    SetSecurityDescriptorDacl(&sd, TRUE, 0, FALSE);
+
+    sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+    sa.lpSecurityDescriptor = &sd;
 
     //  This function has to be in a system-wide critical section so that
     //  two instances of the library don't accidentally create signaler
     //  crossing the process boundary.
     //  We'll use named event object to implement the critical section.
-    HANDLE sync = CreateEvent (NULL, FALSE, TRUE, "zmq-signaler-port-sync");
+    //  Note that if the event object already exists, the CreateEvent requests
+    //  EVENT_ALL_ACCESS access right. If this fails, we try to open
+    //  the event object asking for SYNCHRONIZE access only.
+    HANDLE sync = CreateEvent (&sa, FALSE, TRUE, TEXT ("Global\\zmq-signaler-port-sync"));
+    if (sync == NULL && GetLastError () == ERROR_ACCESS_DENIED)
+      sync = OpenEvent (SYNCHRONIZE | EVENT_MODIFY_STATE, FALSE, TEXT ("Global\\zmq-signaler-port-sync"));
+
     win_assert (sync != NULL);
 
     //  Enter the critical section.
@@ -265,7 +283,7 @@ int zmq::signaler_t::make_fdpair (fd_t *r_, fd_t *w_)
         (char *)&tcp_nodelay, sizeof (tcp_nodelay));
     wsa_assert (rc != SOCKET_ERROR);
 
-    //  Bind listening socket to any free local port.
+    //  Bind listening socket to signaler port.
     struct sockaddr_in addr;
     memset (&addr, 0, sizeof (addr));
     addr.sin_family = AF_INET;
@@ -282,28 +300,66 @@ int zmq::signaler_t::make_fdpair (fd_t *r_, fd_t *w_)
     *w_ = WSASocket (AF_INET, SOCK_STREAM, 0, NULL, 0,  0);
     wsa_assert (*w_ != INVALID_SOCKET);
 
+    //  On Windows, preventing sockets to be inherited by child processes.
+    BOOL brc = SetHandleInformation ((HANDLE) *w_, HANDLE_FLAG_INHERIT, 0);
+    win_assert (brc);
+
     //  Set TCP_NODELAY on writer socket.
     rc = setsockopt (*w_, IPPROTO_TCP, TCP_NODELAY,
         (char *)&tcp_nodelay, sizeof (tcp_nodelay));
     wsa_assert (rc != SOCKET_ERROR);
 
     //  Connect writer to the listener.
-    rc = connect (*w_, (sockaddr *) &addr, sizeof (addr));
-    wsa_assert (rc != SOCKET_ERROR);
+    rc = connect (*w_, (struct sockaddr*) &addr, sizeof (addr));
 
-    //  Accept connection from writer.
-    *r_ = accept (listener, NULL, NULL);
-    wsa_assert (*r_ != INVALID_SOCKET);
+    //  Save errno if connection fails
+    int conn_errno = 0;
+    if (rc == SOCKET_ERROR) {
+        conn_errno = WSAGetLastError ();
+    } else {
+        //  Accept connection from writer.
+        *r_ = accept (listener, NULL, NULL);
+
+        if (*r_ == INVALID_SOCKET) {
+            conn_errno = WSAGetLastError ();
+        }
+    }
 
     //  We don't need the listening socket anymore. Close it.
     rc = closesocket (listener);
     wsa_assert (rc != SOCKET_ERROR);
 
     //  Exit the critical section.
-    BOOL brc = SetEvent (sync);
+    brc = SetEvent (sync);
     win_assert (brc != 0);
 
-    return 0;
+    //  Release the kernel object
+    brc = CloseHandle (sync);
+    win_assert (brc != 0);
+
+    if (*r_ != INVALID_SOCKET) {
+        //  On Windows, preventing sockets to be inherited by child processes.
+        brc = SetHandleInformation ((HANDLE) *r_, HANDLE_FLAG_INHERIT, 0);
+        win_assert (brc);
+
+        return 0;
+    } else {
+        //  Cleanup writer if connection failed
+        rc = closesocket (*w_);
+        wsa_assert (rc != SOCKET_ERROR);
+
+        *w_ = INVALID_SOCKET;
+
+        //  Set errno from saved value
+        errno = wsa_error_to_errno (conn_errno);
+
+        //  Ideally, we would return errno to the caller signaler_t()
+        //  Unfortunately, it uses errno_assert() which gives "Unknown error"
+        //  We might as well assert here and print the actual error message
+        wsa_assert_no (conn_errno);
+
+        return -1;
+    }
 
 #elif defined ZMQ_HAVE_OPENVMS
 
@@ -313,7 +369,7 @@ int zmq::signaler_t::make_fdpair (fd_t *r_, fd_t *w_)
     //
     //  The bug will be fixed in V5.6 ECO4 and beyond.  In the meantime, we'll
     //  create the socket pair manually.
-    sockaddr_in lcladdr;
+    struct sockaddr_in lcladdr;
     memset (&lcladdr, 0, sizeof (lcladdr));
     lcladdr.sin_family = AF_INET;
     lcladdr.sin_addr.s_addr = htonl (INADDR_LOOPBACK);

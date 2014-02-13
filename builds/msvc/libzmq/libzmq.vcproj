@@ -42,6 +42,7 @@
 				Name="VCCLCompilerTool"
 				AdditionalOptions="-DDLL_EXPORT -DFD_SETSIZE=1024 -D_CRT_SECURE_NO_WARNINGS"
 				Optimization="0"
+				PreprocessorDefinitions="NOMINMAX"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -259,6 +260,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\..\src\dealer.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\..\src\decoder.cpp"
 				>
 			</File>
@@ -280,6 +285,10 @@
 			</File>
 			<File
 				RelativePath="..\..\..\src\err.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\errno.cpp"
 				>
 			</File>
 			<File
@@ -371,6 +380,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\..\src\proxy.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\..\src\pub.cpp"
 				>
 			</File>
@@ -399,6 +412,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\..\src\router.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\..\src\select.cpp"
 				>
 			</File>
@@ -423,6 +440,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\..\src\tcp.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\..\src\tcp_address.cpp"
 				>
 			</File>
@@ -443,15 +464,15 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\..\src\v1_decoder.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\src\v1_encoder.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\..\src\xpub.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\..\src\xrep.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\..\src\xreq.cpp"
 				>
 			</File>
 			<File
@@ -526,6 +547,10 @@
 			</File>
 			<File
 				RelativePath="..\..\..\src\err.hpp"
+				>
+			</File>
+			<File
+				RelativePath="..\errno.hpp"
 				>
 			</File>
 			<File
@@ -645,6 +670,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\..\src\proxy.hpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\..\src\pub.hpp"
 				>
 			</File>
@@ -701,6 +730,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\..\src\tcp.hpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\..\src\tcp_address.hpp"
 				>
 			</File>
@@ -718,6 +751,18 @@
 			</File>
 			<File
 				RelativePath="..\..\..\src\trie.hpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\src\v1_decoder.hpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\src\v1_encoder.hpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\src\v1_protocol.hpp"
 				>
 			</File>
 			<File

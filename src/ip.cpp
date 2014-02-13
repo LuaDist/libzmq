@@ -46,8 +46,13 @@ zmq::fd_t zmq::open_socket (int domain_, int type_, int protocol_)
 #endif
 
     fd_t s = socket (domain_, type_, protocol_);
-    if (s == retired_fd)
-        return retired_fd;
+#ifdef ZMQ_HAVE_WINDOWS
+    if (s == INVALID_SOCKET)
+        return INVALID_SOCKET;
+#else
+    if (s == -1)
+        return -1;
+#endif
 
     //  If there's no SOCK_CLOEXEC, let's try the second best option. Note that
     //  race condition can cause socket not to be closed (if fork happens
@@ -57,30 +62,13 @@ zmq::fd_t zmq::open_socket (int domain_, int type_, int protocol_)
     errno_assert (rc != -1);
 #endif
 
+    //  On Windows, preventing sockets to be inherited by child processes.
+#if defined ZMQ_HAVE_WINDOWS && defined HANDLE_FLAG_INHERIT
+    BOOL brc = SetHandleInformation ((HANDLE) s, HANDLE_FLAG_INHERIT, 0);
+    win_assert (brc);
+#endif
+
     return s;
-}
-
-void zmq::tune_tcp_socket (fd_t s_)
-{
-    //  Disable Nagle's algorithm. We are doing data batching on 0MQ level,
-    //  so using Nagle wouldn't improve throughput in anyway, but it would
-    //  hurt latency.
-    int nodelay = 1;
-    int rc = setsockopt (s_, IPPROTO_TCP, TCP_NODELAY, (char*) &nodelay,
-        sizeof (int));
-#ifdef ZMQ_HAVE_WINDOWS
-    wsa_assert (rc != SOCKET_ERROR);
-#else
-    errno_assert (rc == 0);
-#endif
-
-#ifdef ZMQ_HAVE_OPENVMS
-    //  Disable delayed acknowledgements as they hurt latency is serious manner.
-    int nodelack = 1;
-    rc = setsockopt (s_, IPPROTO_TCP, TCP_NODELACK, (char*) &nodelack,
-        sizeof (int));
-    errno_assert (rc != SOCKET_ERROR);
-#endif
 }
 
 void zmq::unblock_socket (fd_t s_)
@@ -90,14 +78,14 @@ void zmq::unblock_socket (fd_t s_)
     int rc = ioctlsocket (s_, FIONBIO, &nonblock);
     wsa_assert (rc != SOCKET_ERROR);
 #elif ZMQ_HAVE_OPENVMS
-	int nonblock = 1;
-	int rc = ioctl (s_, FIONBIO, &nonblock);
+    int nonblock = 1;
+    int rc = ioctl (s_, FIONBIO, &nonblock);
     errno_assert (rc != -1);
 #else
-	int flags = fcntl (s_, F_GETFL, 0);
-	if (flags == -1)
+    int flags = fcntl (s_, F_GETFL, 0);
+    if (flags == -1)
         flags = 0;
-	int rc = fcntl (s_, F_SETFL, flags | O_NONBLOCK);
+    int rc = fcntl (s_, F_SETFL, flags | O_NONBLOCK);
     errno_assert (rc != -1);
 #endif
 }
@@ -119,4 +107,3 @@ void zmq::enable_ipv4_mapping (fd_t s_)
 #endif
 #endif
 }
-

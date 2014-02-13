@@ -19,35 +19,41 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <assert.h>
+#include "../include/zmq.h"
 #include <string.h>
 
-#include "../include/zmq.h"
+#undef NDEBUG
+#include <assert.h>
 
 static void do_bind_and_verify (void *s, const char *endpoint)
 {
     int rc = zmq_bind (s, endpoint);
     assert (rc == 0);
-
-    char test [255];
-    size_t siz = 255;
-    rc = zmq_getsockopt (s, ZMQ_LAST_ENDPOINT, test, &siz);
-    assert (rc == 0 && strcmp (test, endpoint) == 0);
+    char reported [255];
+    size_t size = 255;
+    rc = zmq_getsockopt (s, ZMQ_LAST_ENDPOINT, reported, &size);
+    assert (rc == 0 && strcmp (reported, endpoint) == 0);
 }
 
-int main (int argc, char *argv [])
+int main (void)
 {
     //  Create the infrastructure
     void *ctx = zmq_init (1);
     assert (ctx);
 
-    void *sb = zmq_socket (ctx, ZMQ_XREP);
+    void *sb = zmq_socket (ctx, ZMQ_ROUTER);
     assert (sb);
 
     do_bind_and_verify (sb, "tcp://127.0.0.1:5560");
     do_bind_and_verify (sb, "tcp://127.0.0.1:5561");
     do_bind_and_verify (sb, "ipc:///tmp/testep");
 
-    return 0 ;
+    int rc = zmq_close (sb);
+    assert (rc == 0);
+    
+    rc = zmq_term (ctx);
+    assert (rc == 0);
+
+    return 0;
 }
 

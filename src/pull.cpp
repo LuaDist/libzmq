@@ -24,8 +24,8 @@
 #include "msg.hpp"
 #include "pipe.hpp"
 
-zmq::pull_t::pull_t (class ctx_t *parent_, uint32_t tid_) :
-    socket_base_t (parent_, tid_)
+zmq::pull_t::pull_t (class ctx_t *parent_, uint32_t tid_, int sid_) :
+    socket_base_t (parent_, tid_, sid_)
 {
     options.type = ZMQ_PULL;
 }
@@ -36,6 +36,9 @@ zmq::pull_t::~pull_t ()
 
 void zmq::pull_t::xattach_pipe (pipe_t *pipe_, bool icanhasall_)
 {
+    // icanhasall_ is unused
+    (void)icanhasall_;
+
     zmq_assert (pipe_);
     fq.attach (pipe_);
 }
@@ -52,7 +55,10 @@ void zmq::pull_t::xterminated (pipe_t *pipe_)
 
 int zmq::pull_t::xrecv (msg_t *msg_, int flags_)
 {
-    return fq.recv (msg_, flags_);
+    // flags_ is unused
+    (void)flags_;
+
+    return fq.recv (msg_);
 }
 
 bool zmq::pull_t::xhas_in ()

@@ -26,10 +26,13 @@
 
 #include "fd.hpp"
 #include "i_engine.hpp"
+#include "i_msg_sink.hpp"
 #include "io_object.hpp"
-#include "encoder.hpp"
-#include "decoder.hpp"
+#include "i_encoder.hpp"
+#include "i_decoder.hpp"
 #include "options.hpp"
+#include "socket_base.hpp"
+#include "../include/zmq.h"
 
 namespace zmq
 {
@@ -40,20 +43,22 @@ namespace zmq
     //  This engine handles any socket with SOCK_STREAM semantics,
     //  e.g. TCP socket or an UNIX domain socket.
 
-    class stream_engine_t : public io_object_t, public i_engine
+    class stream_engine_t : public io_object_t, public i_engine, public i_msg_sink
     {
     public:
 
-        stream_engine_t (fd_t fd_, const options_t &options_);
+        stream_engine_t (fd_t fd_, const options_t &options_, const std::string &endpoint);
         ~stream_engine_t ();
 
         //  i_engine interface implementation.
         void plug (zmq::io_thread_t *io_thread_,
            zmq::session_base_t *session_);
-        void unplug ();
         void terminate ();
         void activate_in ();
         void activate_out ();
+
+        //  i_msg_sink interface implementation.
+        virtual int push_msg (msg_t *msg_);
 
         //  i_poll_events interface implementation.
         void in_event ();
@@ -61,8 +66,17 @@ namespace zmq
 
     private:
 
+        //  Unplug the engine from the session.
+        void unplug ();
+
         //  Function to handle network disconnections.
         void error ();
+
+        //  Receives the greeting message from the peer.
+        int receive_greeting ();
+
+        //  Detects the protocol used by the peer.
+        bool handshake ();
 
         //  Writes data to the socket. Returns the number of bytes actually
         //  written (even zero is to be considered to be a success). In case
@@ -78,25 +92,53 @@ namespace zmq
         //  Underlying socket.
         fd_t s;
 
+        //  Size of the greeting message:
+        //  Preamble (10 bytes) + version (1 byte) + socket type (1 byte).
+        const static size_t greeting_size = 12;
+
+        //  True iff we are registered with an I/O poller.
+        bool io_enabled;
+
         handle_t handle;
 
         unsigned char *inpos;
         size_t insize;
-        decoder_t decoder;
+        i_decoder *decoder;
 
         unsigned char *outpos;
         size_t outsize;
-        encoder_t encoder;
+        i_encoder *encoder;
+
+        //  When true, we are still trying to determine whether
+        //  the peer is using versioned protocol, and if so, which
+        //  version.  When false, normal message flow has started.
+        bool handshaking;
+
+        //  The receive buffer holding the greeting message
+        //  that we are receiving from the peer.
+        unsigned char greeting [greeting_size];
+
+        //  The number of bytes of the greeting message that
+        //  we have already received.
+        unsigned int greeting_bytes_read;
+
+        //  The send buffer holding the greeting message
+        //  that we are sending to the peer.
+        unsigned char greeting_output_buffer [greeting_size];
 
         //  The session this engine is attached to.
         zmq::session_base_t *session;
 
-        //  Detached transient session.
-        zmq::session_base_t *leftover_session;
-
         options_t options;
 
+        // String representation of endpoint
+        std::string endpoint;
+
         bool plugged;
+        bool terminating;
+
+        // Socket
+        zmq::socket_base_t *socket;
 
         stream_engine_t (const stream_engine_t&);
         const stream_engine_t &operator = (const stream_engine_t&);

@@ -7,6 +7,7 @@
 project ( libzmq CXX C )
 cmake_minimum_required ( VERSION 2.8 )
 include ( cmake/dist.cmake )
+include ( TestZMQVersion )
 include ( configure )
 
 #2DO OpenPGM (ZMQ_HAVE_OPENPGM)
@@ -16,16 +17,9 @@ file ( GLOB ZMQ_SRC src/*.cpp )
 
 add_definitions ( -D_REENTRANT -D_THREAD_SAFE )
 if ( WIN32 )
+  add_definitions( -DWIN32 -DDLL_EXPORT -DFD_SETSIZE=1024 -D_CRT_SECURE_NO_WARNINGS )
   set ( ZMQ_PLATFORM ZMQ_HAVE_WINDOWS )
-  set ( LIBS Ws2_32 )
-  add_definitions(
-  	-DWIN32
-	-DDLL_EXPORT
-# NB: May require tweaking for highly connected applications.
-	-DFD_SETSIZE=1024
-	-D_CRT_SECURE_NO_WARNINGS
-	-D_WIN32_WINNT=${_zmq_WIN32_WINNT}
-  )
+  set ( LIBS ws2_32 rpcrt4 )
   #TODO? HAVE_MINGW32
 elseif ( CYGWIN )
 set ( ZMQ_PLATFORM ZMQ_HAVE_CYGWIN )

@@ -18,6 +18,14 @@ add_definitions ( -D_REENTRANT -D_THREAD_SAFE )
 if ( WIN32 )
   set ( ZMQ_PLATFORM ZMQ_HAVE_WINDOWS )
   set ( LIBS Ws2_32 )
+  add_definitions(
+  	-DWIN32
+	-DDLL_EXPORT
+# NB: May require tweaking for highly connected applications.
+	-DFD_SETSIZE=1024
+	-D_CRT_SECURE_NO_WARNINGS
+	-D_WIN32_WINNT=${_zmq_WIN32_WINNT}
+  )
   #TODO? HAVE_MINGW32
 elseif ( CYGWIN )
 set ( ZMQ_PLATFORM ZMQ_HAVE_CYGWIN )
@@ -38,6 +46,8 @@ else ( )
 endif ( )
 
 configure_file ( src/platform.hpp.cmake ${CMAKE_CURRENT_BINARY_DIR}/platform.hpp )
+configure_file( src/version.rc.in ${CMAKE_CURRENT_BINARY_DIR}/version.rc )
+list ( APPEND ZMQ_SRC ${CMAKE_CURRENT_BINARY_DIR}/version.rc )
 
 add_library ( zmq ${ZMQ_SRC} )
 target_link_libraries ( zmq ${LIBS} )
